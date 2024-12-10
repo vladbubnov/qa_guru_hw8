@@ -14,8 +14,19 @@ def product():
 
 
 @pytest.fixture
+def product2():
+    return Product("notebook", 1000, "This is a notebook", 100)
+
+
+@pytest.fixture
 def cart(product):
     return Cart()
+
+
+count_add_product = random.randint(10, 20)
+count_add_product2 = random.randint(10, 20)
+count_remove_product = random.randint(1, 10)
+count_remove_product2 = random.randint(1, 10)
 
 
 class TestProducts:
@@ -53,28 +64,61 @@ class TestCart:
     """
 
     def test_add_product(self, cart, product):
-        count_product = random.randint(1, 10)
-        cart.add_product(product, count_product)
-        assert cart.products[product] == count_product, "Неожидаемое количество товаров в корзине"
+        cart.add_product(product, count_add_product)
+        assert cart.products[product] == count_add_product, "Неожидаемое количество товаров в корзине"
+
+    def test_add_multiple_products(self, cart, product, product2):
+        cart.add_product(product, count_add_product)
+        cart.add_product(product2, count_add_product2)
+        assert cart.products[product] == count_add_product, "Неожидаемое количество товаров в корзине"
+        assert cart.products[product2] == count_add_product2, "Неожидаемое количество товаров в корзине"
 
     def test_remove_product(self, cart, product):
-        count_add_product = random.randint(10, 20)
-        count_remove_product = random.randint(1, 10)
         expected_result = count_add_product - count_remove_product
-
         cart.add_product(product, count_add_product)
         cart.remove_product(product, count_remove_product)
         assert cart.products[product] == expected_result
 
-    @pytest.mark.parametrize("count_add_product, count_remove_product", [
-        random.randint(10, 20)
-    ])
-    def test_remove_product_entirely_and_more_than_available(self, cart, product):
-        cart.add_product(product, 5)
-        cart.remove_product(product)
-        assert product not in cart.products
+    def test_remove_multiple_products(self, cart, product, product2):
+        expected_result_product = count_add_product - count_remove_product
+
+        cart.add_product(product, count_add_product)
+        cart.add_product(product2, count_add_product2)
+        cart.remove_product(product, count_remove_product)
+        cart.remove_product(product2, count_add_product2)
+        assert cart.products[product] == expected_result_product
+        assert product2 not in cart.products
 
     def test_remove_product_more_than_available(self, cart, product):
-        cart.add_product(product, 5)
-        cart.remove_product(product, 10)
+        cart.add_product(product, count_add_product)
+        cart.remove_product(product, count_add_product + 1)
         assert product not in cart.products
+
+    def test_clear_cart(self, cart, product):
+        cart.add_product(product, count_add_product)
+        cart.clear()
+        assert len(cart.products) == 0
+
+    def test_get_total_price(self, cart, product, product2):
+        cart.add_product(product, count_add_product)
+        expected_result = count_add_product * product.price
+        assert cart.get_total_price() == expected_result
+
+        cart.add_product(product2, count_add_product2)
+        expected_result += count_add_product2 * product2.price
+        assert cart.get_total_price() == expected_result
+
+    def test_buy_successful(self, cart, product):
+        expected_result = product.quantity - count_add_product
+
+        cart.add_product(product, count_add_product)
+        cart.buy()
+        assert len(cart.products) == 0
+        assert product.quantity == expected_result
+
+    def test_buy_insufficient_stock(self, cart, product):
+        value_product = product.quantity + count_add_product
+        cart.add_product(product, value_product)
+        with pytest.raises(ValueError, match=f"Недостаточно товара '{product.name}' на складе для покупки "
+                                             f"{value_product} единиц."):
+            cart.buy()
